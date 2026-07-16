@@ -1,0 +1,72 @@
+{
+  "id": "sftp_ftp",
+  "name": "SFTP / FTP",
+  "name_en": "SFTP / FTP",
+  "version": "1.0.0",
+  "description": "Intercambio de archivos por SFTP/FTP: listar directorios, subir, descargar, mover y eliminar archivos en un servidor remoto",
+  "description_en": "File exchange over SFTP/FTP: list directories, upload, download, move and delete files on a remote server",
+  "category": "utilities",
+  "category_en": "utilities",
+  "keywords": ["sftp", "ftp", "ftps", "archivos", "files", "file transfer", "ssh", "transferencia de archivos", "paramiko"],
+  "icon": "icon.svg",
+  "library": {
+    "package": "ruvic-sftp-ftp-connector",
+    "install": "pip install git+https://github.com/tu-org/conector-sftp-ftp.git#subdirectory=lib",
+    "import_name": "ruvic_sftp_ftp_connector"
+  },
+  "auth_modes": [
+    {
+      "id": "sftp_password",
+      "label": "SFTP con usuario y contraseña",
+      "fields": [
+        { "key": "host", "label": "Host", "type": "text", "required": true, "placeholder": "sftp.miempresa.com" },
+        { "key": "port", "label": "Puerto", "type": "number", "required": false, "default": "22" },
+        { "key": "username", "label": "Usuario", "type": "text", "required": true },
+        { "key": "password", "label": "Contraseña", "type": "password", "secret": true, "required": true },
+        { "key": "host_key_fingerprint", "label": "Huella digital del host (opcional)", "type": "text", "required": false, "placeholder": "SHA256:...", "help_text": "Recomendado: pégala aquí para verificar la identidad del servidor SSH en cada conexión y prevenir ataques man-in-the-middle. Si la dejas vacía, se acepta la clave del host en la primera conexión (Trust On First Use), con una advertencia registrada." },
+        { "key": "base_path", "label": "Directorio raíz permitido", "type": "text", "required": false, "default": "/", "help_text": "Todas las operaciones quedan restringidas dentro de esta carpeta, para que el agente no pueda acceder a otras partes del servidor." },
+        { "key": "request_timeout", "label": "Timeout de conexión (segundos)", "type": "number", "required": false, "default": "20" }
+      ]
+    },
+    {
+      "id": "sftp_private_key",
+      "label": "SFTP con clave privada SSH",
+      "fields": [
+        { "key": "host", "label": "Host", "type": "text", "required": true, "placeholder": "sftp.miempresa.com" },
+        { "key": "port", "label": "Puerto", "type": "number", "required": false, "default": "22" },
+        { "key": "username", "label": "Usuario", "type": "text", "required": true },
+        { "key": "private_key", "label": "Clave privada", "type": "password", "secret": true, "required": true, "help_text": "Contenido completo de la clave privada (formato PEM/OpenSSH), incluyendo las líneas -----BEGIN/END-----. Soporta RSA, Ed25519, ECDSA y DSA." },
+        { "key": "private_key_passphrase", "label": "Contraseña de la clave (opcional)", "type": "password", "secret": true, "required": false },
+        { "key": "host_key_fingerprint", "label": "Huella digital del host (opcional)", "type": "text", "required": false, "placeholder": "SHA256:...", "help_text": "Recomendado: verifica la identidad del servidor SSH en cada conexión. Si se deja vacía, se acepta la clave del host en la primera conexión (Trust On First Use)." },
+        { "key": "base_path", "label": "Directorio raíz permitido", "type": "text", "required": false, "default": "/" },
+        { "key": "request_timeout", "label": "Timeout de conexión (segundos)", "type": "number", "required": false, "default": "20" }
+      ]
+    },
+    {
+      "id": "ftp",
+      "label": "FTP / FTPS",
+      "fields": [
+        { "key": "host", "label": "Host", "type": "text", "required": true, "placeholder": "ftp.miempresa.com" },
+        { "key": "port", "label": "Puerto", "type": "number", "required": false, "default": "21" },
+        { "key": "username", "label": "Usuario", "type": "text", "required": true },
+        { "key": "ftp_password", "label": "Contraseña", "type": "password", "secret": true, "required": true },
+        { "key": "use_tls", "label": "Usar FTPS (cifrado)", "type": "boolean", "required": false, "default": "true", "help_text": "Muy recomendado dejarlo activado: FTP sin cifrar envía la contraseña y los archivos en texto plano por la red." },
+        { "key": "base_path", "label": "Directorio raíz permitido", "type": "text", "required": false, "default": "/" },
+        { "key": "request_timeout", "label": "Timeout de conexión (segundos)", "type": "number", "required": false, "default": "20" }
+      ]
+    }
+  ],
+  "env_prefix": "RUVIC_SFTP_FTP_",
+  "operations": [
+    "files.list_directory",
+    "files.upload_file",
+    "files.download_file",
+    "files.move_file",
+    "files.delete_file"
+  ],
+  "test_connection": true,
+  "docs": {
+    "skill": "SKILL.md",
+    "permissions_note": "El usuario configurado necesita permisos de lectura sobre el directorio raíz (base_path) para list_directory/download_file, de escritura para upload_file/move_file, y de eliminación para delete_file. Usa un usuario dedicado a esta integración, acotado (via chroot/jail en el servidor, si es posible) al directorio que realmente necesita usar. delete_file elimina archivos de forma permanente y real — no está bloqueada como en otros conectores de Ruvic."
+  }
+}

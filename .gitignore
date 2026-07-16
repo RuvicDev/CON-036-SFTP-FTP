@@ -1,0 +1,26 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Bytecode / caché de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Artefactos de build / instalación editable
+*.egg-info/
+build/
+dist/
+
+# Variables de entorno locales (nunca subir credenciales)
+.env
+.env.local
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/

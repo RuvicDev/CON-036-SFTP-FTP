@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conector SFTP / FTP — Ruvic</title>
+  <link rel="stylesheet" href="assets/ruvic.css">
+</head>
+<body>
+  <main class="ruvic-container">
+    <nav class="ruvic-toc" aria-label="Índice">
+      <h2>Contenido</h2>
+      <ol>
+        <li><a href="#que-es">¿Qué es y para qué sirve?</a></li>
+        <li><a href="#prerrequisitos">Prerrequisitos</a></li>
+        <li><a href="#configuracion-fabricante">Configuración en el fabricante</a></li>
+        <li><a href="#permisos">Permisos requeridos</a></li>
+        <li><a href="#configuracion-ruvic">Configuración en Ruvic</a></li>
+        <li><a href="#verificacion">Verificación</a></li>
+        <li><a href="#solucion-problemas">Solución de problemas</a></li>
+        <li><a href="#faq-seguridad">Preguntas frecuentes y notas de seguridad</a></li>
+      </ol>
+    </nav>
+
+    <h1>Conector SFTP / FTP</h1>
+    <p class="guide-updated">{{ULTIMA_ACTUALIZACION}}</p>
+
+    <section>
+      <h2 id="que-es">¿Qué es y para qué sirve?</h2>
+      <p>El conector SFTP/FTP permite que el agente de Ruvic intercambie archivos con un servidor remoto: listar carpetas, subir archivos generados, descargar archivos para procesarlos, moverlos entre carpetas, o eliminarlos. Sirve para integrarse con sistemas que reciben o entregan información por transferencia de archivos en vez de por una API — un patrón muy común en facturación electrónica, integraciones bancarias, EDI, y sistemas legados.</p>
+      <p>Una vez configurado, puedes pedirle al agente cosas como:</p>
+      <ul>
+        <li>"¿Qué archivos hay en la carpeta de pedidos entrantes?"</li>
+        <li>"Sube este reporte a la carpeta de salida."</li>
+        <li>"Descarga el archivo de ayer y muéstrame su contenido."</li>
+        <li>"Mueve los archivos procesados a la carpeta de históricos."</li>
+      </ul>
+      <p>Operaciones soportadas:</p>
+      <table>
+        <thead><tr><th>Operación</th><th>Qué hace</th></tr></thead>
+        <tbody>
+          <tr><td><code>files.list_directory</code></td><td>Lista el contenido de una carpeta remota</td></tr>
+          <tr><td><code>files.upload_file</code></td><td>Sube un archivo nuevo</td></tr>
+          <tr><td><code>files.download_file</code></td><td>Descarga un archivo (retorna su contenido)</td></tr>
+          <tr><td><code>files.move_file</code></td><td>Mueve o renombra un archivo</td></tr>
+          <tr><td><code>files.delete_file</code></td><td>Elimina un archivo — de forma real y permanente</td></tr>
+        </tbody>
+      </table>
+      <div class="callout callout-warning">
+        <span class="callout-title">Este conector SÍ elimina archivos</span>
+        A diferencia de la mayoría de conectores de Ruvic, aquí <code>delete_file</code> ejecuta una eliminación real — no hay papelera de reciclaje ni deshacer. No existe una forma de bloquear esta operación desde el conector; si no quieres permitirla, no le des permiso de eliminación al usuario en el servidor.
+      </div>
+    </section>
+
+    <section>
+      <h2 id="prerrequisitos">Prerrequisitos</h2>
+      <ul>
+        <li>Un servidor <strong>SFTP</strong> (sobre SSH) o <strong>FTP/FTPS</strong> accesible por red desde donde corre Ruvic.</li>
+        <li>Un <strong>usuario dedicado</strong> a esta integración — no reutilices una cuenta personal.</li>
+        <li>Idealmente, que el servidor soporte restringir a ese usuario a una carpeta específica (chroot/jail) — así hay dos capas de protección: la del propio servidor y la de <code>base_path</code> del conector.</li>
+        <li>Para pruebas: puedes levantar un servidor SFTP local con Docker (ver sección de <a href="#verificacion">Verificación</a>) en vez de usar un sistema productivo.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 id="configuracion-fabricante">Configuración en el fabricante</h2>
+      <p>Como este conector se conecta al servidor SFTP/FTP que ya tenga el cliente (no hay un "fabricante" único, como sí pasa con Salesforce u otros), los pasos varían según quién administre ese servidor. Guía general:</p>
+      <ol class="ruvic-steps">
+        <li><strong>Pide la creación de un usuario dedicado</strong> al administrador del servidor, con la contraseña o el par de claves SSH que se va a usar.</li>
+        <li><strong>Pide que se le restrinja a una carpeta específica</strong> (chroot) si el servidor lo soporta — evita que ese usuario pueda ver el resto del sistema de archivos, aunque haya algún error de configuración del lado de Ruvic.</li>
+        <li><strong>Si vas a usar SFTP con clave privada:</strong> genera un par de claves SSH dedicado (no reutilices tu clave personal), ej. con <code>ssh-keygen -t ed25519 -f ruvic_sftp_key</code>, y entrega la <strong>clave pública</strong> al administrador para que la autorice en el servidor. La clave privada es la que se pega en el formulario de Ruvic — nunca la pública.</li>
+        <li><strong>Anota la huella digital del servidor (host key)</strong> para SFTP, si quieres verificarla en Ruvic (recomendado). Puedes obtenerla conectándote una vez por SSH normal:
+          <pre><code>ssh -o FingerprintHash=sha256 usuario@servidor</code></pre>
+          Va a mostrarte una línea como <code>SHA256:AbCdEf1234...</code> — esa es la huella a pegar en el campo "Huella digital del host".
+        </li>
+        <li><strong>Confirma la carpeta exacta</strong> donde el agente va a trabajar (será tu <code>base_path</code>).</li>
+      </ol>
+      <div class="callout callout-info">
+        <span class="callout-title">SFTP vs. FTP</span>
+        Si tienes la opción de elegir, usa <strong>SFTP</strong> (sobre SSH): es el más extendido hoy en día, cifra todo por defecto, y no requiere abrir rangos de puertos adicionales como sí necesita FTP en modo pasivo. Usa FTP solo si el sistema con el que te integras no ofrece SFTP.
+      </div>
+    </section>
+
+    <section>
+      <h2 id="permisos">Permisos requeridos</h2>
+      <table>
+        <thead><tr><th>Permiso en el servidor</th><th>Para qué lo usa el conector</th></tr></thead>
+        <tbody>
+          <tr><td>Lectura sobre el directorio</td><td>Necesario para <code>list_directory</code> y <code>download_file</code></td></tr>
+          <tr><td>Escritura sobre el directorio</td><td>Necesario para <code>upload_file</code> y <code>move_file</code></td></tr>
+          <tr><td>Eliminación sobre el directorio</td><td>Necesario solo si se va a usar <code>delete_file</code> — si prefieres no permitirlo, no otorgues este permiso</td></tr>
+        </tbody>
+      </table>
+      <p>No pidas acceso de administrador del servidor ni acceso a otras carpetas fuera de la que el agente realmente necesita usar.</p>
+    </section>
+
+    <section>
+      <h2 id="configuracion-ruvic">Configuración en Ruvic</h2>
+      <p>Entra a <strong>Settings → Conectores</strong>, busca la tarjeta <strong>SFTP / FTP</strong> y pulsa <strong>Configurar</strong>. Elige el modo según lo que tengas:</p>
+      <table>
+        <thead><tr><th>Modo</th><th>Cuándo usarlo</th></tr></thead>
+        <tbody>
+          <tr><td>SFTP con usuario y contraseña</td><td>El caso más común para servidores SFTP</td></tr>
+          <tr><td>SFTP con clave privada SSH</td><td>Si el administrador prefiere autenticación por clave en vez de contraseña</td></tr>
+          <tr><td>FTP / FTPS</td><td>Solo si el sistema no ofrece SFTP</td></tr>
+        </tbody>
+      </table>
+      <p>Completa el <strong>Host</strong>, las credenciales del modo elegido, y el <strong>Directorio raíz permitido</strong> (<code>base_path</code>) — deja este último bien acotado a la carpeta que el agente realmente necesita usar, no la raíz completa del servidor salvo que sea necesario.</p>
+      <p>Si tienes la huella digital del host (sección anterior), pégala en "Huella digital del host" para que cada conexión verifique la identidad del servidor.</p>
+      <p>Guarda y pulsa <span class="ruvic-button">Probar conexión</span>.</p>
+    </section>
+
+    <section>
+      <h2 id="verificacion">Verificación</h2>
+      <ol class="ruvic-steps">
+        <li><strong>Test de conexión exitoso.</strong> El botón <em>Probar conexión</em> debe responder: <em>"Conexión exitosa a [host] (sftp/ftp)"</em>.</li>
+        <li><strong>Prueba mínima con el agente.</strong> Pide algo de solo lectura primero:
+          <blockquote><em>"¿Qué archivos hay en la carpeta configurada?"</em></blockquote>
+        </li>
+      </ol>
+      <p>Para probar sin depender de un servidor real, puedes levantar uno local con Docker:</p>
+      <pre><code>docker run -d -p 2222:22 -v /tmp/sftp-data:/home/pruebas/upload \
+  atmoz/sftp pruebas:contraseña123:1001</code></pre>
+      <p>Y configurar el conector con Host <code>localhost</code>, Puerto <code>2222</code>, usuario <code>pruebas</code>, contraseña <code>contraseña123</code>, y directorio raíz <code>/upload</code>.</p>
+    </section>
+
+    <section>
+      <h2 id="solucion-problemas">Solución de problemas</h2>
+      <table>
+        <thead><tr><th>Mensaje / síntoma</th><th>Causa probable y solución</th></tr></thead>
+        <tbody>
+          <tr><td>"Autenticación SFTP/FTP fallida"</td><td>Usuario, contraseña o clave incorrectos. Verifica con el administrador del servidor.</td></tr>
+          <tr><td>"No se pudo conectar..." (timeout/red)</td><td>El servidor no es alcanzable desde donde corre Ruvic — puede requerir VPN, whitelist de IP, o el puerto está bloqueado por un firewall.</td></tr>
+          <tr><td>"La huella digital del host no coincide"</td><td>O bien la huella configurada está mal copiada, o el servidor realmente cambió de identidad (posible problema de seguridad real) — no ignores este error sin confirmar con el administrador.</td></tr>
+          <tr><td>"Ruta no permitida... fuera del directorio raíz"</td><td>El agente intentó acceder a una ruta fuera de <code>base_path</code> — es la protección funcionando. Si es un caso legítimo, amplía el <code>base_path</code> configurado.</td></tr>
+          <tr><td>"Sin permisos para..."</td><td>El usuario del servidor no tiene el permiso necesario sobre esa carpeta/archivo. Revisa la sección de Permisos requeridos.</td></tr>
+          <tr><td>list_directory retorna tamaños/fechas vacíos (FTP)</td><td>El servidor FTP no soporta el comando <code>MLSD</code>; es una limitación conocida del protocolo FTP clásico, no un error.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2 id="faq-seguridad">Preguntas frecuentes y notas de seguridad</h2>
+      <h3>¿El agente puede eliminar cualquier archivo del servidor?</h3>
+      <p>Solo dentro del <code>base_path</code> configurado, y solo si el usuario del servidor tiene permiso de eliminación en esa carpeta. Fuera de eso, no.</p>
+
+      <h3>¿Qué es la "huella digital del host" y por qué debería configurarla?</h3>
+      <p>Es un identificador único del servidor SSH. Configurarla evita que alguien intercepte la conexión haciéndose pasar por tu servidor real (ataque man-in-the-middle). Sin ella, el conector acepta la identidad del servidor la primera vez que se conecta (igual que hace tu terminal cuando usas SSH por primera vez a un host nuevo) — funciona, pero es menos seguro.</p>
+
+      <h3>¿Dónde quedan guardadas las credenciales?</h3>
+      <p>Como secreto en el almacén de credenciales de la plataforma. La interfaz nunca vuelve a mostrarlas.</p>
+
+      <h3>Rotación de credenciales</h3>
+      <p>Pide al administrador del servidor que rote la contraseña o regenere el par de claves SSH periódicamente, y actualiza el valor correspondiente en el formulario del conector.</p>
+
+      <div class="callout callout-warning">
+        <span class="callout-title">Buenas prácticas</span>
+        Usa siempre un usuario dedicado y acotado a una carpeta específica (chroot si es posible); prefiere SFTP sobre FTP; activa FTPS si no tienes alternativa a FTP; configura la huella digital del host en SFTP; y no otorgues permiso de eliminación en el servidor salvo que el caso de uso realmente lo requiera.
+      </div>
+    </section>
+  </main>
+</body>
+</html>

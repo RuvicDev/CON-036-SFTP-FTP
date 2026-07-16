@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ruvic-sftp-ftp-connector"
+version = "1.0.0"
+description = "Conector Ruvic para intercambio de archivos por SFTP y FTP/FTPS: listar directorios, subir, descargar, mover y eliminar archivos"
+requires-python = ">=3.10"
+dependencies = [
+    "paramiko>=3.4,<4.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["ruvic_sftp_ftp_connector*"]
